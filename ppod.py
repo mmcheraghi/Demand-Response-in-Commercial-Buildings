@@ -50,7 +50,7 @@ class Critic(nn.Module):
 def evaluate_policy(env, model, mode='validation'):
 	if mode == 'validation':
 		week_num = 7
-		s = env.reset(week_num=week_num)
+		s, info = env.reset(week_num=week_num)
 		done, score = False, 0
 		while not done:
 			a = model.select_action(s, deterministic=True)
@@ -60,7 +60,7 @@ def evaluate_policy(env, model, mode='validation'):
 		return score, env.T_in[1:]
 	else:
 		week_num = 8
-		s = env.reset(week_num=week_num)
+		s, info = env.reset(week_num=week_num)
 		done, score = False, 0
 		while not done:
 			a = model.select_action(s, deterministic=True)
@@ -280,7 +280,7 @@ def main(C=100, R=2, h=80, alpha=0.3, render=False, compare=False, gamma=0.55132
 		tin, rew = [], []
 		# while total_steps < opt.Max_train_steps:
 		while elapsed_time < opt.Max_train_time:
-			s = env.reset(week_num=np.random.randint(1,7))
+			s, info = env.reset(week_num=np.random.randint(1,7))
 			done = False
 
 			'''Interact & trian'''
