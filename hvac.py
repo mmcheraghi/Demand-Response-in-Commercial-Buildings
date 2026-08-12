@@ -1,4 +1,4 @@
-import gym
+import gymnasium
 from gym import spaces
 import numpy as np
 import pickle
