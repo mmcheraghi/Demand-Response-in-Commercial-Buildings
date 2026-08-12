@@ -52,9 +52,9 @@ def evaluate_policy(env, model, mode='validation'):
 		week_num = 7
 		s, info = env.reset(week_num=week_num)
 		done, score = False, 0
-		while not done:
+		while not (done or truncated):
 			a = model.select_action(s, deterministic=True)
-			s_next, r, done, _ = env.step(a[0])
+			s_next, r, done, truncated,  _ = env.step(a[0])
 			score += r
 			s = s_next
 		return score, env.T_in[1:]
@@ -62,9 +62,9 @@ def evaluate_policy(env, model, mode='validation'):
 		week_num = 8
 		s, info = env.reset(week_num=week_num)
 		done, score = False, 0
-		while not done:
+		while not (done or truncated):
 			a = model.select_action(s, deterministic=True)
-			s_next, r, done, _ = env.step(a[0])
+			s_next, r, done, truncated, _ = env.step(a[0])
 			score += r
 			s = s_next
 		return score, env.T_in[1:], env.load, env.cost, env.cost_components
