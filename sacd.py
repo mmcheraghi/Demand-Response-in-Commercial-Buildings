@@ -11,6 +11,50 @@ from hvac import HVAC
 import pickle
 import time
 import os
+import matplotlib.pyplot as plt
+#########################################################################
+def plot_trajectory_rewards(
+    trajectory_rewards,
+    num_trajectories=10,
+    filename="trajectory_rewards.png",
+    alg_name = "sacd"
+):
+    """
+    Plot and save the rewards of the first completed trajectories.
+    """
+
+    rewards = np.asarray(trajectory_rewards[:num_trajectories])
+
+    if len(rewards) == 0:
+        print("No completed trajectories to plot.")
+        return
+
+    plt.figure(figsize=(8, 5))
+
+    plt.plot(
+        np.arange(1, len(rewards) + 1),
+        rewards,
+        marker="o",
+        linewidth=2
+    )
+
+    plt.xlabel("Trajectory Number")
+    plt.ylabel("Trajectory Reward")
+    plt.title(f"Reward of the First {len(rewards)} Trajectories for {alg_name}")
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Save the figure
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
+
+    print(f"Plot saved to: {os.path.abspath(filename)}")
+
+    # Display the figure
+    plt.show()
+
+    # Close the figure to release memory
+    plt.close()
+##########################################################################
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -300,8 +344,14 @@ def main(C=100, R=2, h=80, alpha=1, render=False, compare=False, gamma=0.55132, 
 		rewards = []
 		total_steps, elapsed_time, tin, rew, best_score = 0, 0, [], [], -np.inf
 		# while total_steps < opt.Max_train_steps:
+    # Stores the reward of each completed trajectory
+		trajectory_rewards = []
+		num_trajectories = 40
 		while elapsed_time < opt.Max_train_time:
+      # Reset the reward for the new trajectory
+			trajectory_reward = 0.0
 			s, done, ep_r, steps = env.reset(week_num=np.random.randint(1,7)), False, 0, 0
+
 			while not done:
 				steps += 1  # steps in current episode
 
@@ -311,6 +361,8 @@ def main(C=100, R=2, h=80, alpha=1, render=False, compare=False, gamma=0.55132, 
 				else:
 					a = model.select_action(s, deterministic=False)
 				s_next, r, done, _ = env.step(a)
+        # Add the step reward to the current trajectory reward
+				trajectory_reward += float(np.asarray(r).squeeze())
 
 				buffer.add(s, a, r, s_next, done)
 				s = s_next
@@ -336,14 +388,26 @@ def main(C=100, R=2, h=80, alpha=1, render=False, compare=False, gamma=0.55132, 
 					elapsed_times.append(elapsed_time)
 					rewards.append(best_score)
 					log_message = f"EnvName: {EnvName[opt.EnvIdex]}, seed: {opt.seed}, steps: {int(total_steps / 1000)}k, score: {int(score)}, elapsed time: {int(elapsed_time)}\n"
-					with open(log_file_path, "a") as log_file:
-						log_file.write(log_message)
-					print(log_message)
+					# with open(log_file_path, "a") as log_file:
+					# 	log_file.write(log_message)
+					# print(log_message)
 				total_steps += 1
 		# with open(f'res/tin_{EnvName[opt.EnvIdex]}.pkl', 'wb') as file:
 		# 	pickle.dump(tin, file)
 		# with open(f'res/rew_{EnvName[opt.EnvIdex]}.pkl', 'wb') as file:
 		# 	pickle.dump(rew, file)
+      # This point is reached after the trajectory is completed
+			trajectory_rewards.append(trajectory_reward)
+			print(
+      f'Trajectory {len(trajectory_rewards)} reward: '
+      '{trajectory_reward:.3f}')   
+
+      # Plot after the first 10 trajectories are completed
+			if len(trajectory_rewards) == num_trajectories:
+				plot_trajectory_rewards(trajectory_rewards,num_trajectories=num_trajectories)
+				print("**************")
+        # Optional: stop training after plotting the first 10 trajectories
+				exit()
 
 	with open(f'res/track/track_{EnvName[opt.EnvIdex]}.pkl', 'wb') as f:
 			pickle.dump((elapsed_times, rewards), f)
