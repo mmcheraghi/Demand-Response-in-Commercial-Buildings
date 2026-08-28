@@ -14,6 +14,50 @@ import pickle
 import plotly.graph_objects as go
 import time
 import os
+import matplotlib.pyplot as plt
+#########################################################################
+def plot_trajectory_rewards(
+    trajectory_rewards,
+    num_trajectories=10,
+    filename="trajectory_rewards.png",
+    alg_name = "ppod"
+):
+    """
+    Plot and save the rewards of the first completed trajectories.
+    """
+
+    rewards = np.asarray(trajectory_rewards[:num_trajectories])
+
+    if len(rewards) == 0:
+        print("No completed trajectories to plot.")
+        return
+
+    plt.figure(figsize=(8, 5))
+
+    plt.plot(
+        np.arange(1, len(rewards) + 1),
+        rewards,
+        marker="o",
+        linewidth=2
+    )
+
+    plt.xlabel("Trajectory Number")
+    plt.ylabel("Trajectory Reward")
+    plt.title(f"Reward of the First {len(rewards)} Trajectories for {alg_name}")
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Save the figure
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
+
+    print(f"Plot saved to: {os.path.abspath(filename)}")
+
+    # Display the figure
+    plt.show()
+
+    # Close the figure to release memory
+    plt.close()
+##########################################################################
 
 class Actor(nn.Module):
 	def __init__(self, state_dim, action_dim, net_width):
@@ -50,21 +94,21 @@ class Critic(nn.Module):
 def evaluate_policy(env, model, mode='validation'):
 	if mode == 'validation':
 		week_num = 7
-		s, info = env.reset(week_num=week_num)
+		s = env.reset(week_num=week_num)
 		done, score = False, 0
-		while not (done or truncated):
+		while not done:
 			a = model.select_action(s, deterministic=True)
-			s_next, r, done, truncated,  _ = env.step(a[0])
+			s_next, r, done, _ = env.step(a[0])
 			score += r
 			s = s_next
 		return score, env.T_in[1:]
 	else:
 		week_num = 8
-		s, info = env.reset(week_num=week_num)
+		s = env.reset(week_num=week_num)
 		done, score = False, 0
-		while not (done or truncated):
+		while not done:
 			a = model.select_action(s, deterministic=True)
-			s_next, r, done, truncated, _ = env.step(a[0])
+			s_next, r, done, _ = env.step(a[0])
 			score += r
 			s = s_next
 		return score, env.T_in[1:], env.load, env.cost, env.cost_components
@@ -279,8 +323,13 @@ def main(C=100, R=2, h=80, alpha=0.3, render=False, compare=False, gamma=0.55132
 		traj_lenth, total_steps, elapsed_time, best_score = 0, 0, 0, -np.inf
 		tin, rew = [], []
 		# while total_steps < opt.Max_train_steps:
+    # Stores the reward of each completed trajectory
+		trajectory_rewards = []
+		num_trajectories = 40
 		while elapsed_time < opt.Max_train_time:
-			s, info = env.reset(week_num=np.random.randint(1,7))
+      # Reset the reward for the new trajectory
+			trajectory_reward = 0.0
+			s = env.reset(week_num=np.random.randint(1,7))
 			done = False
 
 			'''Interact & trian'''
@@ -288,6 +337,8 @@ def main(C=100, R=2, h=80, alpha=0.3, render=False, compare=False, gamma=0.55132
 				'''Interact with Env'''
 				a, logprob_a = agent.select_action(s, deterministic=False) # use stochastic when training
 				s_next, r, done, _ = env.step(a)
+        # Add the step reward to the current trajectory reward
+				trajectory_reward += float(np.asarray(r).squeeze())
 
 				'''Store the current transition'''
 				agent.put_data(s, a, r, s_next, logprob_a, done, idx = traj_lenth)
@@ -315,9 +366,21 @@ def main(C=100, R=2, h=80, alpha=0.3, render=False, compare=False, gamma=0.55132
 					elapsed_times.append(elapsed_time)
 					rewards.append(best_score)
 					log_message = f"EnvName: {EnvName[opt.EnvIdex]}, seed: {opt.seed}, steps: {int(total_steps / 1000)}k, score: {int(score)}, elapsed time: {int(elapsed_time)}\n"
-					with open(log_file_path, "a") as log_file:
-						log_file.write(log_message)
-					print(log_message)
+					# with open(log_file_path, "a") as log_file:
+						# log_file.write(log_message)
+					# print(log_message)
+      # This point is reached after the trajectory is completed
+			trajectory_rewards.append(trajectory_reward)
+			print(
+      f'Trajectory {len(trajectory_rewards)} reward: '
+      '{trajectory_reward:.3f}')   
+
+      # Plot after the first 10 trajectories are completed
+			if len(trajectory_rewards) == num_trajectories:
+				plot_trajectory_rewards(trajectory_rewards,num_trajectories=num_trajectories)
+				print("**************")
+        # Optional: stop training after plotting the first 10 trajectories
+				exit()
 
 		with open(f'res/track/track_{EnvName[opt.EnvIdex]}.pkl', 'wb') as f:
 			pickle.dump((elapsed_times, rewards), f)
