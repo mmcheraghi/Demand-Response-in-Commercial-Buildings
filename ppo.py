@@ -12,12 +12,11 @@ import argparse
 import pickle
 import plotly.graph_objects as go
 import time
-import matplotlib.pyplot as plt
 # import mlflow
 
 # mlflow.set_tracking_uri("sqlite:///mlflow.db") #The name of the database to use
 # mlflow.set_experiment("ctrl-ppo") #If already exists mlflow will append to existing data. Else it will make a new experiment.
-
+import matplotlib.pyplot as plt
 #########################################################################
 def plot_trajectory_rewards(
     trajectory_rewards,
