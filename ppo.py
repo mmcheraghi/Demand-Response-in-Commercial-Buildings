@@ -12,11 +12,54 @@ import argparse
 import pickle
 import plotly.graph_objects as go
 import time
+import matplotlib.pyplot as plt
 # import mlflow
 
 # mlflow.set_tracking_uri("sqlite:///mlflow.db") #The name of the database to use
 # mlflow.set_experiment("ctrl-ppo") #If already exists mlflow will append to existing data. Else it will make a new experiment.
 
+#########################################################################
+def plot_trajectory_rewards(
+    trajectory_rewards,
+    num_trajectories=10,
+    filename="trajectory_rewards.png"
+):
+    """
+    Plot and save the rewards of the first completed trajectories.
+    """
+
+    rewards = np.asarray(trajectory_rewards[:num_trajectories])
+
+    if len(rewards) == 0:
+        print("No completed trajectories to plot.")
+        return
+
+    plt.figure(figsize=(8, 5))
+
+    plt.plot(
+        np.arange(1, len(rewards) + 1),
+        rewards,
+        marker="o",
+        linewidth=2
+    )
+
+    plt.xlabel("Trajectory Number")
+    plt.ylabel("Trajectory Reward")
+    plt.title(f"Reward of the First {len(rewards)} Trajectories")
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Save the figure
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
+
+    print(f"Plot saved to: {os.path.abspath(filename)}")
+
+    # Display the figure
+    plt.show()
+
+    # Close the figure to release memory
+    plt.close()
+##########################################################################
 def act_clipper(a):
 	if a>1:
 		return 1
@@ -369,7 +412,15 @@ def main(beta=0.1, gamma=0.55132, render=False, compare=False, cpp=0.000067):
 		rewards = []
 		total_steps, elapsed_time, traj_lenth, act, rew, best_score = 0, 0, 0, [], [], -np.inf
 		# while total_steps < opt.Max_train_steps:
+
+    # Stores the reward of each completed trajectory
+		trajectory_rewards = []
+		num_trajectories = 4
+    
 		while elapsed_time < opt.Max_train_time:
+      # Reset the reward for the new trajectory
+			trajectory_reward = 0.0
+
 			s = env.reset(week_num=np.random.randint(1,7))
 			done = False
 
@@ -378,6 +429,9 @@ def main(beta=0.1, gamma=0.55132, render=False, compare=False, cpp=0.000067):
 				'''Interact with Env'''
 				a, logprob_a = agent.select_action(s, deterministic=False) # use stochastic when training
 				s_next, r, done, _ = env.step(act_clipper(a)) 
+        
+        # Add the step reward to the current trajectory reward
+				trajectory_reward += float(np.asarray(r).squeeze())
 
 				'''Store the current transition'''
 				agent.put_data(s, a, r, s_next, logprob_a, done, idx = traj_lenth)
@@ -406,6 +460,18 @@ def main(beta=0.1, gamma=0.55132, render=False, compare=False, cpp=0.000067):
 					print(f'EnvName:{BrifEnvName[opt.EnvIdex]} , Steps: {int(total_steps/1000)}k, Episode Reward:{score}, Elapsed Time:{elapsed_time}')
 					#mlflow.log_metric("score",score[0])
 					#mlflow.log_metric("time",elapsed_time)
+      # This point is reached after the trajectory is completed
+			trajectory_rewards.append(trajectory_reward)
+			print(
+      f'Trajectory {len(trajectory_rewards)} reward: '
+      '{trajectory_reward:.3f}')   
+
+      # Plot after the first 10 trajectories are completed
+			if len(trajectory_rewards) == num_trajectories:
+				plot_trajectory_rewards(trajectory_rewards,num_trajectories=num_trajectories)
+				print(completed)
+        # Optional: stop training after plotting the first 10 trajectories
+			exit()
 
 
 		with open(f'res/track/track_{EnvName[opt.EnvIdex]}.pkl', 'wb') as f:
