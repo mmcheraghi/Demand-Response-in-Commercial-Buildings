@@ -22,7 +22,8 @@ import matplotlib.pyplot as plt
 def plot_trajectory_rewards(
     trajectory_rewards,
     num_trajectories=10,
-    filename="trajectory_rewards.png"
+    filename="trajectory_rewards.png",
+    alg_name = "ppo"
 ):
     """
     Plot and save the rewards of the first completed trajectories.
@@ -45,7 +46,7 @@ def plot_trajectory_rewards(
 
     plt.xlabel("Trajectory Number")
     plt.ylabel("Trajectory Reward")
-    plt.title(f"Reward of the First {len(rewards)} Trajectories")
+    plt.title(f"Reward of the First {len(rewards)} Trajectories for {alg_name}")
     plt.grid(True)
     plt.tight_layout()
 
@@ -415,7 +416,7 @@ def main(beta=0.1, gamma=0.55132, render=False, compare=False, cpp=0.000067):
 
     # Stores the reward of each completed trajectory
 		trajectory_rewards = []
-		num_trajectories = 4
+		num_trajectories = 40
     
 		while elapsed_time < opt.Max_train_time:
       # Reset the reward for the new trajectory
@@ -469,9 +470,9 @@ def main(beta=0.1, gamma=0.55132, render=False, compare=False, cpp=0.000067):
       # Plot after the first 10 trajectories are completed
 			if len(trajectory_rewards) == num_trajectories:
 				plot_trajectory_rewards(trajectory_rewards,num_trajectories=num_trajectories)
-				print(completed)
+				print("**************")
         # Optional: stop training after plotting the first 10 trajectories
-			exit()
+				exit()
 
 
 		with open(f'res/track/track_{EnvName[opt.EnvIdex]}.pkl', 'wb') as f:
