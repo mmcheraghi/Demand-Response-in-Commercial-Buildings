@@ -12,6 +12,50 @@ import argparse
 import pickle
 import time
 #import mlflow
+import matplotlib.pyplot as plt
+#########################################################################
+def plot_trajectory_rewards(
+    trajectory_rewards,
+    num_trajectories=10,
+    filename="trajectory_rewards.png",
+    alg_name = "td3"
+):
+    """
+    Plot and save the rewards of the first completed trajectories.
+    """
+
+    rewards = np.asarray(trajectory_rewards[:num_trajectories])
+
+    if len(rewards) == 0:
+        print("No completed trajectories to plot.")
+        return
+
+    plt.figure(figsize=(8, 5))
+
+    plt.plot(
+        np.arange(1, len(rewards) + 1),
+        rewards,
+        marker="o",
+        linewidth=2
+    )
+
+    plt.xlabel("Trajectory Number")
+    plt.ylabel("Trajectory Reward")
+    plt.title(f"Reward of the First {len(rewards)} Trajectories for {alg_name}")
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Save the figure
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
+
+    print(f"Plot saved to: {os.path.abspath(filename)}")
+
+    # Display the figure
+    plt.show()
+
+    # Close the figure to release memory
+    plt.close()
+##########################################################################
 
 #mlflow.set_tracking_uri("sqlite:///mlflow.db") #The name of the database to use
 #mlflow.set_experiment("ctrl-td3") #If already exists mlflow will append to existing data. Else it will make a new experiment.
@@ -305,7 +349,12 @@ def main(beta=0.2, gamma=0.55132, render=False, compare=False, cpp=0.000067):
 		rewards = []
 		total_steps, elapsed_time, act, rew, best_score = 0, 0, [], [], -np.inf
 		# while total_steps < opt.Max_train_steps:
+    # Stores the reward of each completed trajectory
+		trajectory_rewards = []
+		num_trajectories = 40
 		while elapsed_time < opt.Max_train_time:
+      # Reset the reward for the new trajectory
+			trajectory_reward = 0.0
 			s = env.reset(week_num=np.random.randint(1,7))
 			done = False
 
@@ -314,6 +363,8 @@ def main(beta=0.2, gamma=0.55132, render=False, compare=False, cpp=0.000067):
 				if total_steps < (10*opt.max_e_steps): a = env.action_space.sample() # warm up
 				else: a = agent.select_action(s, deterministic=False)
 				s_next, r, done, _ = env.step(act_clipper(a))
+        # Add the step reward to the current trajectory reward
+				trajectory_reward += float(np.asarray(r).squeeze())
 
 				agent.replay_buffer.add(s, a, r, s_next)
 				s = s_next
@@ -340,7 +391,18 @@ def main(beta=0.2, gamma=0.55132, render=False, compare=False, cpp=0.000067):
 					rewards.append(best_score)
 					#mlflow.log_metric("score",ep_r[0])
 					#mlflow.log_metric("time",elapsed_time)
+      # This point is reached after the trajectory is completed
+			trajectory_rewards.append(trajectory_reward)
+			print(
+      f'Trajectory {len(trajectory_rewards)} reward: '
+      '{trajectory_reward:.3f}')   
 
+      # Plot after the first 10 trajectories are completed
+			if len(trajectory_rewards) == num_trajectories:
+				plot_trajectory_rewards(trajectory_rewards,num_trajectories=num_trajectories)
+				print("**************")
+        # Optional: stop training after plotting the first 10 trajectories
+				exit()
 		# with open(f'res/track/track_{BrifEnvName[opt.EnvIdex]}.pkl', 'wb') as f:
 		# 	pickle.dump((elapsed_times, rewards), f)
 		env.close()
